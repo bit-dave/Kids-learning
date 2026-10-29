@@ -1,5 +1,5 @@
 // Network-first: always try the live site, fall back to cache only when offline.
-const C='kl-v5';const F=['./','index.html','content.js','manifest.json','icon-192.png','icon-512.png'];
+const C='kl-v6';const F=['./','index.html','content.js','manifest.json','icon-192.png','icon-512.png'];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(F.map(u=>new Request(u,{cache:'reload'})))).catch(()=>{}))});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{const r=e.request;if(r.method!=='GET'||new URL(r.url).origin!==location.origin)return;

@@ -22,6 +22,7 @@ table{width:100%;border-collapse:collapse;font-size:16px}td,th{padding:8px 6px;b
 #fx.on{display:flex}#fx .lvup{font-size:3rem;font-weight:900;animation:pop 1s ease-out}#fx .burst{font-size:5rem;animation:spin 1.2s ease-out}
 @keyframes pop{0%{transform:scale(.2);opacity:0}60%{transform:scale(1.25);opacity:1}100%{transform:scale(1)}}@keyframes spin{0%{transform:rotate(-180deg) scale(0)}100%{transform:rotate(0) scale(1)}}
 .conf{position:fixed;top:-20px;font-size:28px;animation:fall 2.2s linear forwards;z-index:10}@keyframes fall{to{transform:translateY(110vh) rotate(540deg)}}
+label{display:block;font-weight:700;margin:10px 0}.pw{display:block;width:100%;font:inherit;padding:12px;border:2px solid #d9d0ff;border-radius:12px;margin-top:6px}
 .tip{background:#eafff0;border-radius:12px;padding:10px;margin:6px 0}
 #sheet{position:fixed;inset:0;background:#24204acc;z-index:8;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(10px + env(safe-area-inset-top)) 10px 20px}#sheet.on{display:block}
 #sheet .card{max-width:640px;margin:0 auto 12px}
@@ -134,15 +135,37 @@ function studyMenu(s){render=()=>studyMenu(s);const p=P();const ks=skillsFor(s,p
 <div class="card"><h2>Pick a skill to learn</h2><p style="margin-top:0">Read the card, then tap <b>▶ Practice this</b>.</p>${ks.map(k=>{const c=studyFor(k,p.level)||{i:'📘'};const st=p.skills[s+'|'+k];const pc=st&&st.a?Math.round(st.c/st.a*100):null;return `<button class="skl" onclick="openStudy('${jsq(k)}','${p.level}',false,'${s}')"><span class="sc-ico">${c.i}</span><span>${esc(k)}</span><span class="pill">${pc==null?'New':(pc>=85?'🟢 ':pc>=70?'🟡 ':'🔴 ')+pc+'%'}</span></button>`}).join('')}</div>`}
 function review(){const p=P();const list=(p.missed||[]).slice(0,10);if(!list.length){menu();return}subj=list[0].s;mode='review';onlySkill=null;qi=0;score=0;run=0;results=[];clearInterval(timer);
  Q=list.map(m=>({q:m.q,choices:shuffle(m.choices),answer:m.answer,explain:m.explain,passage:m.passage,skill:m.skill,subj:m.s,lv:m.lv}));show()}
-function gate(){const a=R(6,12),b=R(6,12),ans=prompt(`Parents only: what is ${a} × ${b}?`);if(ans===null)return;if(parseInt(ans)===a*b)parents();else alert('Not quite — ask a grown-up!')}
-function parents(){render=parents;app.innerHTML=`<div class="row"><button class="alt sm" onclick="home()">← Done</button><b>👪 Parent dashboard</b>${muteBtn()}</div>
+// ---- parent password (only a SHA-256 hash is stored, in its own key; progress data is untouched) ----
+const PWKEY='kidslearning_pwhash';
+async function sha(t){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('kidslearning:'+t));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+function gate(){pwScreen(localStorage.getItem(PWKEY)?'enter':'create')}
+function pwScreen(m,msg){render=()=>pwScreen(m);const two=m!=='enter';const title={create:'🔐 Create a parent password',enter:'🔐 Parents only',change:'🔑 Change password'}[m];
+ app.innerHTML=`<div class="row"><button class="alt sm" onclick="${m==='change'?'parents()':'home()'}">← Back</button><b>${title}</b><span></span></div>
+<div class="card"><h2>${title}</h2><p style="margin-top:0">${m==='create'?'Set a password so only grown-ups can open the parent settings. It is saved on this device only.':m==='change'?'Enter your current password, then a new one twice.':'Enter the parent password.'}</p>
+${m==='change'?'<label>Current password<input id="pw0" class="pw" type="password" autocomplete="current-password"></label>':''}
+<label>${m==='enter'?'Password':'New password'}<input id="pw1" class="pw" type="password" autocomplete="${m==='enter'?'current-password':'new-password'}"></label>
+${two?'<label>Type it again<input id="pw2" class="pw" type="password" autocomplete="new-password"></label>':''}
+<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" style="width:24px;height:24px" onchange="document.querySelectorAll('.pw').forEach(i=>i.type=this.checked?'text':'password')"> Show password</label>
+<div id="pwmsg" style="color:#d12f6b;font-weight:700;min-height:1.4em">${msg||''}</div>
+<button style="width:100%" onclick="pwSubmit('${m}')">${m==='create'?'Save password':m==='change'?'Change password':'Unlock'}</button>
+${m==='enter'?'<button class="alt sm" style="width:100%;margin-top:10px" onclick="forgotPw()">Forgot password?</button><div id="forgot"></div>':''}</div>`;
+ const f=document.getElementById(m==='change'?'pw0':'pw1');f&&f.focus();app.querySelectorAll('.pw').forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')pwSubmit(m)})}
+async function pwSubmit(m){const v=id=>(document.getElementById(id)||{}).value||'';const err=t=>document.getElementById('pwmsg').textContent=t;
+ if(!(window.crypto&&crypto.subtle)){err('This browser can\'t lock settings here. Open the app from its https link.');return}
+ const stored=localStorage.getItem(PWKEY);
+ if(m==='enter'){if(await sha(v('pw1'))===stored)parents();else err('That password is not right.');return}
+ if(m==='change'&&await sha(v('pw0'))!==stored){err('Current password is not right.');return}
+ const a=v('pw1');if(a.length<4){err('Use at least 4 characters.');return}if(a!==v('pw2')){err('The two passwords don\'t match.');return}
+ localStorage.setItem(PWKEY,await sha(a));parents(m==='change'?'✅ Password changed.':'✅ Password saved.')}
+function forgotPw(){document.getElementById('forgot').innerHTML=`<div class="tip" style="margin-top:10px">To reset the password, clear this site's data in the browser:<br>• <b>iPhone:</b> Settings › Safari › Advanced › Website Data › find this site › Delete.<br>• <b>Android Chrome:</b> ⋮ › Settings › Site settings › All sites › this site › Clear &amp; reset.<br><b>Warning:</b> clearing site data also erases all stars, badges and progress on this device.</div>`}
+function parents(note){render=()=>parents();app.innerHTML=`<div class="row"><button class="alt sm" onclick="home()">← Done</button><b>👪 Parent dashboard</b>${muteBtn()}</div>${note?`<div class="tip">${note}</div>`:''}
 ${S.profiles.map((p,i)=>{const all=Object.entries(p.skills).map(([k,s])=>({n:k.replace('|',' · ').replace('math','Math').replace('ela','ELA'),pct:Math.round(s.c/s.a*100),a:s.a})).sort((x,y)=>x.pct-y.pct);
  const ta=all.reduce((x,y)=>x+y.a,0),tc=Object.values(p.skills).reduce((x,y)=>x+y.c,0);
  return `<div class="card"><h2>${p.emoji} ${esc(p.name)}</h2><p>Level setting: <b>${lvName(p.level)}</b> · ⭐ ${p.stars} · Lv ${rank(p.stars)} · 🔥 ${p.streak}-day streak · last played ${p.lastDay||'never'}</p>
  <p>${p.quizzes} quizzes · ${ta} questions · ${ta?Math.round(tc/ta*100):0}% correct · ${p.badges.length} badges</p>
  ${all.length?`<table><tr><th>Weakest → strongest</th><th>Tried</th><th>%</th></tr>${all.slice(0,8).map(r=>`<tr><td>${esc(r.n)}</td><td>${r.a}</td><td>${r.pct}%</td></tr>`).join('')}</table>`:''}
  <div class="row" style="margin-top:10px"><button class="alt sm" onclick="renameKid(${i})">✏️ Rename</button><button class="pink sm" onclick="resetKid(${i})">↺ Reset stats</button>${S.profiles.length>1?`<button class="alt sm" onclick="delKid(${i})">🗑 Remove</button>`:''}</div></div>`}).join('')}
-<div class="card"><small>All progress is stored only on this device. Nothing is sent anywhere — no accounts, ads, or tracking.</small></div>`}
+<div class="card"><button class="alt" style="width:100%" onclick="pwScreen('change')">🔑 Change password</button></div><div class="card"><small>All progress is stored only on this device. Nothing is sent anywhere — no accounts, ads, or tracking.</small></div>`}
 function resetKid(i){const p=S.profiles[i];if(!confirm(`Reset all stars, badges and progress for ${p.name}?`))return;S.profiles[i]=newKid(p.name,p.emoji,p.level);save();parents()}
 function renameKid(i){const n=prompt('New name?',S.profiles[i].name);if(n){S.profiles[i].name=n.slice(0,20);save();parents()}}
 function delKid(i){if(confirm(`Remove ${S.profiles[i].name}?`)){S.profiles.splice(i,1);save();parents()}}
