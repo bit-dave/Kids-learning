@@ -23,7 +23,20 @@ table{width:100%;border-collapse:collapse;font-size:16px}td,th{padding:8px 6px;b
 @keyframes pop{0%{transform:scale(.2);opacity:0}60%{transform:scale(1.25);opacity:1}100%{transform:scale(1)}}@keyframes spin{0%{transform:rotate(-180deg) scale(0)}100%{transform:rotate(0) scale(1)}}
 .conf{position:fixed;top:-20px;font-size:28px;animation:fall 2.2s linear forwards;z-index:10}@keyframes fall{to{transform:translateY(110vh) rotate(540deg)}}
 .tip{background:#eafff0;border-radius:12px;padding:10px;margin:6px 0}
-</style></head><body><div class="wrap" id="app"></div><div id="fx"></div>
+#sheet{position:fixed;inset:0;background:#24204acc;z-index:8;display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(10px + env(safe-area-inset-top)) 10px 20px}#sheet.on{display:block}
+#sheet .card{max-width:640px;margin:0 auto 12px}
+.sc-head{display:flex;gap:12px;align-items:center;margin-bottom:6px}.sc-ico{font-size:2.2rem;background:#efeaff;border-radius:18px;min-width:64px;height:64px;display:flex;align-items:center;justify-content:center}
+.sc-head h2{margin:0}.sc-sub{color:#6c4cf1;font-weight:700;font-size:.9rem}
+.lbl{font-weight:800;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;margin:14px 0 6px}
+.what{font-size:1.15rem;line-height:1.45;margin:6px 0}
+ol.steps{margin:0;padding-left:1.3em;line-height:1.5}ol.steps li{margin:6px 0}
+.ex{background:#fffbe8;border-left:5px solid #f5c542;border-radius:12px;padding:10px 12px}.ex .exq{font-weight:800;margin-bottom:6px}
+.tipbox{background:#eafff0;border-left:5px solid #2fbf71;border-radius:12px;padding:10px 12px;margin-top:12px}
+.why{background:#fff6f6;border-left:5px solid #ff5fa2;border-radius:12px;padding:10px 12px;margin:10px 0;text-align:left}
+.ok{background:#effff4;border-left:5px solid #2fbf71;border-radius:12px;padding:10px 12px;margin:10px 0}
+.skl{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:8px 0;background:#f4f1ff;color:#24204a}.skl .sc-ico{min-width:48px;height:48px;font-size:1.6rem;background:#fff}
+.pill{margin-left:auto;font-size:.85rem;background:#fff;border-radius:99px;padding:4px 10px;white-space:nowrap}
+</style></head><body><div class="wrap" id="app"></div><div id="fx"></div><div id="sheet"></div>
 <script src="content.js"></script>
 <script>
 // All data stays on this device (localStorage). No network, no ads, no tracking.
@@ -59,33 +72,41 @@ function menu(){render=menu;const p=P();app.innerHTML=`<div class="row"><button 
 <div class="card"><h2>Play</h2><div class="modes"><button onclick="start('math','practice')">➗ Math<br><small>Practice</small></button><button onclick="start('ela','practice')">📚 Reading<br><small>Practice</small></button>
 <button class="pink" onclick="start('math','lightning')">⚡ Math<br><small>Lightning 60s</small></button><button class="pink" onclick="start('ela','lightning')">⚡ Reading<br><small>Lightning 60s</small></button></div>
 <div class="row" style="margin-top:12px"><button class="alt" style="flex:1" onclick="progress()">📈 My progress</button></div></div>
+<div class="card"><h2>📖 Study</h2><p style="margin-top:0">Learn a skill first, then practice it.</p><div class="modes"><button class="alt" onclick="studyMenu('math')">📖 Math<br><small>Study cards</small></button><button class="alt" onclick="studyMenu('ela')">📖 Reading<br><small>Study cards</small></button></div>
+${(p.missed||[]).length?`<button style="width:100%;margin-top:10px;background:#ff7a00" onclick="review()">🔁 Review my mistakes (${p.missed.length})</button>`:'<div class="tip" style="margin-top:10px">🔁 Questions you miss show up here so you can try them again.</div>'}</div>
 <div class="card"><h2>Badges</h2>${p.badges.length?p.badges.map(b=>`<span class="badge">${b}</span>`).join(''):'Finish a quiz to earn your first badge!'}</div>`}
-let Q,qi,score,subj,mode,run,timer,tLeft,results;
-function start(s,m){subj=s;mode=m;qi=0;score=0;run=0;results=[];Q=makeQuiz(s,P().level,m==='lightning'?60:10);
+let Q,qi,score,subj,mode,run,timer,tLeft,results,onlySkill=null;
+function start(s,m,sk){subj=s;mode=m;onlySkill=sk||null;qi=0;score=0;run=0;results=[];Q=makeQuiz(s,P().level,m==='lightning'?60:10,onlySkill);
  if(m==='lightning'){tLeft=60;clearInterval(timer);timer=setInterval(()=>{tLeft--;const el=document.getElementById('tm');if(el)el.textContent='⏱ '+tLeft;if(tLeft<=5&&tLeft>0)SND.tick();if(tLeft<=0){clearInterval(timer);done()}},1000)}show()}
 function quit(){clearInterval(timer);menu()}
 function show(){render=show;const q=Q[qi];app.innerHTML=`<div class="row"><button class="alt sm" onclick="quit()">✕ Quit</button>${mode==='lightning'?`<span class="timer" id="tm">⏱ ${tLeft}</span>`:''}<b>${mode==='lightning'?'':(qi+1)+'/'+Q.length+' · '}✅ ${score}${run>=3?` <span class="streak">🔥${run}</span>`:''}</b>${muteBtn()}</div>
-${mode==='practice'?`<div class="bar"><i style="width:${qi/Q.length*100}%"></i></div>`:''}
-<div class="card">${q.passage?`<div class="passage">${esc(q.passage)}</div>`:''}<small style="color:#6c4cf1">${esc(q.skill)}</small><p class="big">${esc(q.q)}</p>${q.choices.map((c,i)=>`<button class="choice" data-i="${i}">${esc(c)}</button>`).join('')}<div id="fb"></div></div>`;
+${mode!=='lightning'?`<div class="bar"><i style="width:${qi/Q.length*100}%"></i></div>`:''}
+<div class="card">${q.passage?`<div class="passage">${esc(q.passage)}</div>`:''}<div class="row" style="justify-content:space-between"><small style="color:#6c4cf1;font-weight:700">${mode==='review'?'🔁 Review · ':''}${esc(q.skill)}</small>${mode!=='lightning'&&studyFor(q.skill,q.lv||P().level)?`<button class="alt sm" style="min-height:40px;padding:6px 12px" onclick="openStudy('${jsq(q.skill)}','${q.lv||P().level}',true)">📖 Study</button>`:''}</div><p class="big">${esc(q.q)}</p>${q.choices.map((c,i)=>`<button class="choice" data-i="${i}">${esc(c)}</button>`).join('')}<div id="fb"></div></div>`;
 app.querySelectorAll('.choice').forEach(b=>b.onclick=()=>answer(b))}
 function answer(b){const q=Q[qi],ok=q.choices[b.dataset.i]===q.answer;app.querySelectorAll('.choice').forEach(x=>{x.disabled=true;if(q.choices[x.dataset.i]===q.answer)x.classList.add('right')});
-results.push({skill:q.skill,ok});if(ok){score++;run++;SND.right();if(run%5===0)confetti(8)}else{run=0;b.classList.add('wrong');SND.wrong()}
+results.push({skill:q.skill,ok,s:q.subj||subj});if(ok){score++;run++;SND.right();if(run%5===0)confetti(8)}else{run=0;b.classList.add('wrong');SND.wrong()}
+const p=P();p.missed=p.missed||[];const qk=q.q+'|'+(q.passage||'');p.missed=p.missed.filter(m=>m.q+'|'+(m.passage||'')!==qk);
+if(!ok)p.missed.unshift({s:q.subj||subj,lv:q.lv||p.level,skill:q.skill,q:q.q,choices:q.choices,answer:q.answer,explain:q.explain,passage:q.passage||'',t:Date.now()});
+p.missed=p.missed.slice(0,30);save();
 if(mode==='lightning'){setTimeout(next,ok?350:900);return}
-document.getElementById('fb').innerHTML=`<p>${ok?(run>=3?`🔥 ${run} in a row!`:'🎉 Correct!'):'Not quite — answer: <b>'+esc(q.answer)+'</b>'} ${q.explain?'<br><small>'+esc(q.explain)+'</small>':''}</p><button style="width:100%" onclick="next()">${qi+1<Q.length?'Next →':'Finish'}</button>`}
+const sk=studyFor(q.skill,q.lv||P().level);
+document.getElementById('fb').innerHTML=ok?`<div class="ok"><b>${run>=3?`🔥 ${run} in a row!`:'🎉 Correct!'}</b>${q.explain?`<details style="margin-top:6px"><summary>Why?</summary>${stepsHTML(q.explain)}</details>`:''}</div><button style="width:100%" onclick="next()">${qi+1<Q.length?'Next →':'Finish'}</button>`
+:`<div class="why"><b>Not quite!</b> The answer is <b>${esc(q.answer)}</b>.${q.explain?`<div class="lbl" style="color:#ff5fa2">Here's why</div>${stepsHTML(q.explain)}`:''}<div style="margin-top:8px;font-size:.9rem">🔁 Saved to <b>Review my mistakes</b>.</div></div>
+<div class="row">${sk?`<button class="alt" style="flex:1" onclick="openStudy('${jsq(q.skill)}','${q.lv||P().level}',true)">📖 Study: ${esc(q.skill)}</button>`:''}<button style="flex:1" onclick="next()">${qi+1<Q.length?'Next →':'Finish'}</button></div>`}
 function next(){if(mode==='lightning'&&tLeft<=0)return;qi++;if(qi<Q.length)show();else done()}
 function today(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
 function done(){clearInterval(timer);render=()=>{};const p=P(),lv=p.level,k=subj+lv,before=rank(p.stars),tot=results.length;
- results.forEach(r=>{const key=subj+'|'+r.skill,s=p.skills[key]||(p.skills[key]={a:0,c:0,lv:{}});s.a++;if(r.ok)s.c++;s.lv[lv]=1});
+ results.forEach(r=>{const key=(r.s||subj)+'|'+r.skill,s=p.skills[key]||(p.skills[key]={a:0,c:0,lv:{}});s.a++;if(r.ok)s.c++;s.lv[lv]=1});
  const t=today();if(p.lastDay!==t){const y=new Date();y.setDate(y.getDate()-1);const yd=y.getFullYear()+'-'+(y.getMonth()+1)+'-'+y.getDate();p.streak=p.lastDay===yd?p.streak+1:1;p.lastDay=t}
- p.stars+=score;p.quizzes++;if(mode==='practice')p.best[k]=Math.max(p.best[k]||0,score);else p.lightBest[k]=Math.max(p.lightBest[k]||0,score);
- const nb=[];const add=b=>{if(!p.badges.includes(b)){p.badges.push(b);nb.push(b)}};add('🎈 First Quiz');
- if(mode==='practice'&&score===10)add(`🏆 Perfect ${subjName(subj)} · ${lvName(lv)}`);if(mode==='lightning'&&score>=15)add('⚡ Lightning 15');if(mode==='lightning'&&score>=25)add('⚡ Lightning 25');
+ const nb=[];const add0=b=>{if(!p.badges.includes(b)){p.badges.push(b);nb.push(b)}};p.stars+=score;p.quizzes++;if(mode==='review'){if(score>0)add0('🔁 Mistake Fixer')}else if(onlySkill){}else if(mode==='practice')p.best[k]=Math.max(p.best[k]||0,score);else p.lightBest[k]=Math.max(p.lightBest[k]||0,score);
+ const add=b=>{if(!p.badges.includes(b)){p.badges.push(b);nb.push(b)}};add('🎈 First Quiz');
+ if(mode==='practice'&&!onlySkill&&score===10)add(`🏆 Perfect ${subjName(subj)} · ${lvName(lv)}`);if(mode==='lightning'&&score>=15)add('⚡ Lightning 15');if(mode==='lightning'&&score>=25)add('⚡ Lightning 25');
  if(p.streak>=3)add('🔥 3-Day Streak');if(p.streak>=7)add('🔥 7-Day Streak');[50,250,1000].forEach(n=>p.stars>=n&&add(`⭐ ${n} Stars`));save();
- const up=rank(p.stars)>before;
+ const up=rank(p.stars)>before;const wrongs=results.filter(r=>!r.ok).length;
  app.innerHTML=`<div class="card" style="text-align:center"><h1>${score>=(mode==='lightning'?15:8)?'🌟 Amazing!':score>=5?'👍 Nice work!':'💪 Keep going!'}</h1>
-<p class="big">${mode==='lightning'?`⚡ ${score} correct in 60 seconds`:`You got ${score}/10`} · +${score} ⭐</p><p>${tot?Math.round(score/tot*100):0}% accuracy · <span class="streak">🔥 ${p.streak}-day streak</span></p>
-${nb.map(b=>`<div class="badge">New: ${b}</div>`).join('')}
-<div class="row" style="justify-content:center;margin-top:14px"><button onclick="start(subj,mode)">🔁 Play again</button><button class="alt" onclick="progress()">📈 Progress</button><button class="alt" onclick="menu()">Menu</button></div></div>`;
+<p class="big">${mode==='lightning'?`⚡ ${score} correct in 60 seconds`:`You got ${score}/${tot}`} · +${score} ⭐</p><p>${tot?Math.round(score/tot*100):0}% accuracy · <span class="streak">🔥 ${p.streak}-day streak</span></p>
+${nb.map(b=>`<div class="badge">New: ${b}</div>`).join('')}${mode==='review'?`<p>${(p.missed||[]).length?`${p.missed.length} left to review.`:'🎉 You cleared all your mistakes!'}</p>`:''}
+<div class="row" style="justify-content:center;margin-top:14px"><button onclick="${mode==='review'?'review()':`start(subj,mode${onlySkill?`,'${jsq(onlySkill)}'`:''})`}">🔁 Play again</button>${(p.missed||[]).length&&mode!=='review'?`<button style="background:#ff7a00" onclick="review()">🔁 Review mistakes (${p.missed.length})</button>`:''}<button class="alt" onclick="progress()">📈 Progress</button><button class="alt" onclick="menu()">Menu</button></div></div>`;
  SND.done();if(up)levelUp(rank(p.stars));else if(score>=8)confetti(20)}
 function confetti(n){for(let i=0;i<n;i++){const e=document.createElement('div');e.className='conf';e.textContent=pick(['🎉','⭐','✨','🎈','💜']);e.style.left=Math.random()*100+'vw';e.style.animationDelay=Math.random()*.6+'s';document.body.appendChild(e);setTimeout(()=>e.remove(),3000)}}
 function levelUp(n){fx.innerHTML=`<div class="burst">🏅</div><div class="lvup">LEVEL UP!</div><p class="big">You reached Level ${n}</p><button class="pink" onclick="fx.className=''">Yay! →</button>`;fx.className='on';SND.lvl();confetti(40)}
@@ -94,9 +115,25 @@ function progress(){render=progress;const p=P();const sec=s=>{const rows=skillRo
  const best=LEVELS.flatMap(g=>g.items).filter(l=>p.best[s+l]!=null||p.lightBest[s+l]!=null).map(l=>`<tr><td>${lvName(l)}</td><td>${p.best[s+l]??'—'}/10</td><td>${p.lightBest[s+l]??'—'}</td></tr>`).join('');
  return `<div class="card"><h2>${s==='math'?'➗':'📚'} ${subjName(s)}</h2>${rows.length?`<table><tr><th>Skill</th><th>Tried</th><th>Correct</th></tr>${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.a}</td><td>${r.pct>=85?'🟢':r.pct>=70?'🟡':'🔴'} ${r.pct}%</td></tr>`).join('')}</table>`:'<p>No quizzes yet.</p>'}
  ${best?`<h3>Best scores</h3><table><tr><th>Level</th><th>Practice</th><th>⚡ Lightning</th></tr>${best}</table>`:''}
- ${weak.length?`<h3>Suggestions</h3>${weak.map(w=>`<div class="tip">💡 Practice <b>${esc(w.name)}</b> more (${w.pct}% so far). Try a Practice round — explanations show after each answer.</div>`).join('')}`:rows.length?'<div class="tip">🌟 No weak spots yet! Try Lightning or move up a level.</div>':''}</div>`};
+ ${weak.length?`<h3>Suggestions</h3>${weak.map(w=>`<div class="tip">💡 Practice <b>${esc(w.name)}</b> more (${w.pct}% so far).${studyFor(w.name,p.level)?` <button class="alt sm" onclick="openStudy('${jsq(w.name)}','${p.level}',false,'${s}')">📖 Study it</button>`:''}</div>`).join('')}`:rows.length?'<div class="tip">🌟 No weak spots yet! Try Lightning or move up a level.</div>':''}</div>`};
  app.innerHTML=`<div class="row"><button class="alt sm" onclick="menu()">← Back</button><b>${p.emoji} ${esc(p.name)}'s progress</b>${muteBtn()}</div>
 <div class="card"><div class="row"><span>⭐ ${p.stars} stars</span><span>Lv ${rank(p.stars)}</span><span class="streak">🔥 ${p.streak}-day</span><span>${p.quizzes} quizzes</span></div></div>${sec('math')}${sec('ela')}`}
+// ---- study cards, explanations, review ----
+function jsq(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+function stepsHTML(ex){const a=[].concat(ex||[]).filter(Boolean);if(!a.length)return'';return a.length===1?`<p style="margin:6px 0">${esc(a[0])}</p>`:`<ol class="steps">${a.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`}
+function studyHTML(skill,lv){const c=studyFor(skill,lv);if(!c)return'';return `<div class="sc-head"><div class="sc-ico">${c.i}</div><div><div class="sc-sub">STUDY CARD · ${esc(lvName(lv))}</div><h2>${esc(skill)}</h2></div></div>
+<div class="lbl" style="color:#6c4cf1">💡 The big idea</div><p class="what">${esc(c.what)}</p>
+<div class="lbl" style="color:#6c4cf1">🪜 How to do it</div>${stepsHTML(c.steps.length>1?c.steps:[c.steps[0],''])}
+<div class="lbl" style="color:#c99400">✏️ Worked example</div><div class="ex"><div class="exq">${esc(c.ex.q)}</div>${stepsHTML(c.ex.a)}</div>
+<div class="tipbox"><b>⭐ Tip:</b> ${esc(c.tip)}</div>`}
+const sheet=document.getElementById('sheet');
+function openStudy(skill,lv,inQuiz,s){const sb=s||subj;sheet.innerHTML=`<div class="card">${studyHTML(skill,lv)}
+<div class="row" style="margin-top:14px">${inQuiz?`<button style="flex:1" onclick="closeStudy()">← Back to my question</button>`:`<button class="alt" style="flex:1" onclick="closeStudy()">Close</button><button style="flex:1" onclick="closeStudy();start('${sb}','practice','${jsq(skill)}')">▶ Practice this</button>`}</div></div>`;sheet.className='on';sheet.scrollTop=0}
+function closeStudy(){sheet.className='';sheet.innerHTML=''}
+function studyMenu(s){render=()=>studyMenu(s);const p=P();const ks=skillsFor(s,p.level);app.innerHTML=`<div class="row"><button class="alt sm" onclick="menu()">← Back</button><b>📖 ${subjName(s)} · ${lvName(p.level)}</b>${muteBtn()}</div>
+<div class="card"><h2>Pick a skill to learn</h2><p style="margin-top:0">Read the card, then tap <b>▶ Practice this</b>.</p>${ks.map(k=>{const c=studyFor(k,p.level)||{i:'📘'};const st=p.skills[s+'|'+k];const pc=st&&st.a?Math.round(st.c/st.a*100):null;return `<button class="skl" onclick="openStudy('${jsq(k)}','${p.level}',false,'${s}')"><span class="sc-ico">${c.i}</span><span>${esc(k)}</span><span class="pill">${pc==null?'New':(pc>=85?'🟢 ':pc>=70?'🟡 ':'🔴 ')+pc+'%'}</span></button>`}).join('')}</div>`}
+function review(){const p=P();const list=(p.missed||[]).slice(0,10);if(!list.length){menu();return}subj=list[0].s;mode='review';onlySkill=null;qi=0;score=0;run=0;results=[];clearInterval(timer);
+ Q=list.map(m=>({q:m.q,choices:shuffle(m.choices),answer:m.answer,explain:m.explain,passage:m.passage,skill:m.skill,subj:m.s,lv:m.lv}));show()}
 function gate(){const a=R(6,12),b=R(6,12),ans=prompt(`Parents only: what is ${a} × ${b}?`);if(ans===null)return;if(parseInt(ans)===a*b)parents();else alert('Not quite — ask a grown-up!')}
 function parents(){render=parents;app.innerHTML=`<div class="row"><button class="alt sm" onclick="home()">← Done</button><b>👪 Parent dashboard</b>${muteBtn()}</div>
 ${S.profiles.map((p,i)=>{const all=Object.entries(p.skills).map(([k,s])=>({n:k.replace('|',' · ').replace('math','Math').replace('ela','ELA'),pct:Math.round(s.c/s.a*100),a:s.a})).sort((x,y)=>x.pct-y.pct);
