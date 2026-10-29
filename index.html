@@ -29,7 +29,8 @@ table{width:100%;border-collapse:collapse;font-size:16px}td,th{padding:8px 6px;b
 // All data stays on this device (localStorage). No network, no ads, no tracking.
 const KEY='kidslearning_v1';
 const newKid=(name,emoji,level)=>({name,emoji,level,stars:0,badges:[],best:{},skills:{},streak:0,lastDay:null,quizzes:0,lightBest:{}});
-let S=JSON.parse(localStorage.getItem(KEY)||'null')||{profiles:[newKid('Addy','🦄','6'),newKid('Lianna','🐬','4')],cur:null,mute:false};
+let S=JSON.parse(localStorage.getItem(KEY)||'null')||{profiles:[newKid('Addy','🦄','6'),newKid('Lianna','🐬','4'),newKid('Dad','🧔','12')],cur:null,mute:false};
+if(!S.profiles.some(p=>p.name==='Dad')&&!S.dadAdded){S.profiles.push(newKid('Dad','🧔','12'));}S.dadAdded=true;localStorage.setItem(KEY,JSON.stringify(S));
 const save=()=>localStorage.setItem(KEY,JSON.stringify(S));const app=document.getElementById('app'),fx=document.getElementById('fx');
 const P=()=>S.profiles[S.cur];const lvName=l=>l==='K'?'Kindergarten':l==='College'?'College':'Grade '+l;
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -42,7 +43,14 @@ document.addEventListener('click',e=>{if(e.target.closest('button:not(.choice)')
 const muteBtn=()=>`<button class="alt sm" onclick="S.mute=!S.mute;save();render()" aria-label="sound">${S.mute?'🔇':'🔊'}</button>`;
 let render=home;
 function home(){render=home;S.cur=null;save();app.innerHTML=`<div class="row"><span></span>${muteBtn()}</div><h1>🌟 Kids Learning</h1><div class="card"><h2>Who's playing?</h2><div class="grid kids">${S.profiles.map((p,i)=>`<button onclick="S.cur=${i};menu()">${p.emoji}<br>${esc(p.name)}<br><small>⭐ ${p.stars} · Lv ${rank(p.stars)}${p.streak>1?' · 🔥'+p.streak:''}</small></button>`).join('')}<button class="alt" onclick="addP()">＋<br>Add kid</button></div></div>
-<div class="row" style="justify-content:center"><button class="alt sm" onclick="gate()">👪 Parents</button></div>`}
+<div class="row" style="justify-content:center"><button class="pink" onclick="board()">🏆 Family Leaderboard</button><button class="alt sm" onclick="gate()">👪 Parents</button></div>`}
+function board(){render=board;const ks=S.profiles.map(p=>{const v=Object.values(p.skills),a=v.reduce((x,y)=>x+y.a,0),c=v.reduce((x,y)=>x+y.c,0);return{p,stars:p.stars,light:Math.max(0,...Object.values(p.lightBest||{})),streak:p.streak||0,acc:a?Math.round(c/a*100):0}});
+ const cats=[['stars','⭐ Total stars',''],['light','⚡ Lightning best',' correct'],['streak','🔥 Streak',' days'],['acc','🎯 Accuracy','%']];
+ const ov=ks.slice().sort((x,y)=>y.stars-x.stars);const lead=ov[0]&&ov[0].stars>0&&(!ov[1]||ov[0].stars>ov[1].stars)?ov[0].p:null;
+ app.innerHTML=`<div class="row"><button class="alt sm" onclick="home()">← Back</button><b>🏆 Family Leaderboard</b>${muteBtn()}</div>
+ <div class="card" style="text-align:center">${lead?`<div style="font-size:4rem;animation:pop 1s">👑</div><h2>${lead.emoji} ${esc(lead.name)} leads with ${lead.stars} ⭐!</h2>`:'<h2>No leader yet — play a quiz to grab the crown 👑</h2>'}</div>
+ ${cats.map(([k,t,u])=>{const r=ks.slice().sort((x,y)=>y[k]-x[k]);return `<div class="card"><h2>${t}</h2><table>${r.map((x,i)=>`<tr><td style="width:44px;font-size:1.4rem">${x[k]>0&&i===0&&(!r[1]||r[0][k]>r[1][k])?'👑':['🥇','🥈','🥉'][i]||i+1}</td><td>${x.p.emoji} ${esc(x.p.name)}</td><td style="text-align:right"><b>${x[k]}${u}</b></td></tr>`).join('')}</table></div>`}).join('')}
+ <div class="card"><small>📱 Scores are saved on this device only. To compete, everyone should play on the same phone or tablet — stats don't sync between devices.</small></div>`}
 function addP(){const n=prompt('Name?');if(!n)return;S.profiles.push(newKid(n.slice(0,20),pick(['🌟','🐱','🦊','🐼','🚀','🌈']),'K'));save();home()}
 function menu(){render=menu;const p=P();app.innerHTML=`<div class="row"><button class="alt sm" onclick="home()">← Switch</button><b>${p.emoji} ${esc(p.name)} · ⭐ ${p.stars} · Lv ${rank(p.stars)} ${p.streak?`<span class="streak">🔥 ${p.streak}-day</span>`:''}</b>${muteBtn()}</div>
 <div class="card"><div class="bar"><i style="width:${p.stars%25*4}%"></i></div><small>${25-p.stars%25} ⭐ to Level ${rank(p.stars)+1}</small></div>
