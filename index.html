@@ -110,5 +110,8 @@ function resetKid(i){const p=S.profiles[i];if(!confirm(`Reset all stars, badges 
 function renameKid(i){const n=prompt('New name?',S.profiles[i].name);if(n){S.profiles[i].name=n.slice(0,20);save();parents()}}
 function delKid(i){if(confirm(`Remove ${S.profiles[i].name}?`)){S.profiles.splice(i,1);save();parents()}}
 S.cur!=null&&S.profiles[S.cur]?menu():home();
-if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js');
+if('serviceWorker'in navigator&&location.protocol!=='file:'){const hadCtl=!!navigator.serviceWorker.controller;let reloaded=false;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadCtl&&!reloaded&&!sessionStorage.getItem('kl_reloaded')){reloaded=true;sessionStorage.setItem('kl_reloaded','1');location.reload()}});
+ navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>{r.update();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')r.update()})}).catch(()=>{});
+ setTimeout(()=>sessionStorage.removeItem('kl_reloaded'),10000);}
 </script></body></html>
